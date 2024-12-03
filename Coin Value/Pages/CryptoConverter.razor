@@ -1,0 +1,159 @@
+﻿@page "/cryptoconverter"
+@using System.Net.Http.Json
+
+<h3>Crypto Converter</h3>
+
+<div class="container">
+    <div>
+        <label>Montant en Fiat :</label>
+        <input type="number" @bind="FiatAmount" />
+    </div>
+    <div>
+        <label>Rechercher une Crypto :</label>
+        <input type="text" @bind="SearchText" placeholder="Rechercher..." />
+    </div>
+    <div>
+        <label>Sélectionner la Crypto :</label>
+        <select @bind="SelectedCrypto">
+            @foreach (var crypto in FilteredCryptos)
+            {
+                <option value="@crypto.Id">@crypto.Name (@crypto.Symbol)</option>
+            }
+        </select>
+    </div>
+    <div>
+        <label>Monnaie Fiat :</label>
+        <select @bind="SelectedFiat">
+            @foreach (var fiat in FiatCurrencies)
+            {
+                <option value="@fiat">@fiat</option>
+            }
+        </select>
+    </div>
+    <button @onclick="Convert">Convertir</button>
+</div>
+
+@if (IsLoading)
+{
+    <p>Chargement en cours...</p>
+}
+else if (ErrorMessage != null)
+{
+    <p class="error">@ErrorMessage</p>
+}
+else if (CryptoValue.HasValue)
+{
+    <p>
+        Avec @FiatAmount @SelectedFiat, tu obtiens environ
+        <strong>@CryptoValue.Value.ToString("F6") @SelectedCrypto</strong>.
+    </p>
+}
+
+@code {
+    // Variables principales
+    private decimal FiatAmount;
+    private string SelectedCrypto = "ethereum";
+    private string SelectedFiat = "eur";
+    private decimal? CryptoValue;
+
+    // Gestion des cryptos et fiat
+    private List<CryptoInfo> Cryptos = new();
+    private List<CryptoInfo> FilteredCryptos => Cryptos
+        .Where(c => c.Name.Contains(SearchText, StringComparison.OrdinalIgnoreCase) || c.Symbol.Contains(SearchText, StringComparison.OrdinalIgnoreCase))
+        .ToList();
+    private string SearchText = "";
+
+    private List<string> FiatCurrencies = new() { "eur", "usd" };
+
+    // État de chargement et erreurs
+    private bool IsLoading = true;
+    private string ErrorMessage = null;
+
+    // Récupération des cryptos au chargement
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCryptos();
+    }
+
+    private async Task LoadCryptos()
+    {
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+
+            var httpClient = new HttpClient();
+            var url = "https://api.coingecko.com/api/v3/coins/list";
+            var response = await httpClient.GetFromJsonAsync<List<CryptoInfo>>(url);
+
+            if (response != null)
+            {
+                // Assurez-vous que "solana" est bien présent
+                Cryptos = response.ToList();
+                if (!Cryptos.Any(c => c.Id == "solana"))
+                {
+                    ErrorMessage = "Solana n'a pas été trouvé dans la liste récupérée.";
+                }
+            }
+            else
+            {
+                ErrorMessage = "Impossible de récupérer la liste des cryptos.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Erreur lors du chargement des cryptos : {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+
+    private async Task Convert()
+    {
+        if (FiatAmount <= 0)
+        {
+            ErrorMessage = "Veuillez entrer un montant valide.";
+            return;
+        }
+
+        try
+        {
+            IsLoading = true;
+            ErrorMessage = null;
+
+            var httpClient = new HttpClient();
+            var url = $"https://api.coingecko.com/api/v3/simple/price?ids={SelectedCrypto}&vs_currencies={SelectedFiat}";
+            var response = await httpClient.GetFromJsonAsync<Dictionary<string, Dictionary<string, decimal>>>(url);
+
+            if (response != null && response.ContainsKey(SelectedCrypto))
+            {
+                var rate = response[SelectedCrypto][SelectedFiat];
+                CryptoValue = FiatAmount / rate;
+            }
+            else
+            {
+                ErrorMessage = $"La crypto sélectionnée ({SelectedCrypto}) n'est pas supportée ou introuvable.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Erreur lors de la conversion : {ex.Message}";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+
+    // Modèle pour les cryptos
+    private class CryptoInfo
+    {
+        public string Id { get; set; }
+        public string Symbol { get; set; }
+        public string Name { get; set; }
+    }
+}

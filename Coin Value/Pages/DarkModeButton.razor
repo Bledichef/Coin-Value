@@ -1,0 +1,18 @@
+﻿@inject IJSRuntime JSRuntime
+
+
+<button @onclick="ToggleDarkMode" class="@DarkModeClass">Toggle Mode</button>
+
+@code {
+    private bool IsDarkMode = false;
+
+    private string DarkModeClass => IsDarkMode ? "btn btn-secondary" : "btn btn-primary";
+
+    private async Task ToggleDarkMode()
+    {
+        IsDarkMode = !IsDarkMode;
+
+        // Applique la classe dark-mode au body
+        await JSRuntime.InvokeVoidAsync("document.body.classList.toggle", "dark-mode");
+    }
+}

@@ -15,6 +15,7 @@ builder.Services.AddBlazorise(options =>
 {
     options.Immediate = true;
 })
+
 .AddBootstrap5Providers()
 .AddFontAwesomeIcons();
 

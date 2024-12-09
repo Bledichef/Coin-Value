@@ -2,6 +2,7 @@
 @using System.Net.Http.Json
 @using System.Text.Json.Serialization
 @using Blazorise.Charts
+@using Coin_Value.Models
 @inject HttpClient Http
 
 <h1>Bienvenue sur Coin Value</h1>
@@ -25,14 +26,14 @@
                     <p>
                         Prix :
                         @(crypto.CurrentPrice > 0
-                            ? crypto.CurrentPrice.ToString("C", new System.Globalization.CultureInfo("fr-FR"))
-                            : "Données indisponibles")
+                                    ? crypto.CurrentPrice.ToString("C", new System.Globalization.CultureInfo("fr-FR"))
+                                    : "Données indisponibles")
                     </p>
                     <p>
                         Changement 24h :
                         @(crypto.PriceChange24h.HasValue
-                            ? (crypto.PriceChange24h.Value >= 0 ? "+" : "") + crypto.PriceChange24h.Value.ToString("F2") + "%"
-                            : "Données indisponibles")
+                                    ? (crypto.PriceChange24h.Value >= 0 ? "+" : "") + crypto.PriceChange24h.Value.ToString("F2") + "%"
+                                    : "Données indisponibles")
                     </p>
                 </div>
             }
@@ -41,13 +42,14 @@
 </div>
 
 <div class="crypto-graph">
-    <BarChart TItem="decimal" Data="@chartData" />
+    @* <LineChart TItem="decimal" Data="@chartData" /> *@
+    <LineChart Data="@chartData"  TItem="decimal" />
 </div>
 
 @code {
     private bool IsLoading = true;
     private string? ErrorMessage = null;
-    private List<Crypto> TopCryptos = new();
+    private List<CryptoModel> TopCryptos = new();
     private ChartData<decimal> chartData = new();
 
     protected override async Task OnInitializedAsync()
@@ -63,12 +65,12 @@
             IsLoading = true;
             ErrorMessage = null;
 
-            var response = await Http.GetFromJsonAsync<List<CryptoApiResponse>>(
+            var response = await Http.GetFromJsonAsync<List<CryptoApiResponseModel>>(
                 "https://api.coingecko.com/api/v3/coins/markets?vs_currency=eur&order=market_cap_desc&per_page=5&page=1&sparkline=false");
 
             if (response != null)
             {
-                TopCryptos = response.Select(c => new Crypto
+                TopCryptos = response.Select(c => new CryptoModel
                     {
                         Name = c.Name,
                         Symbol = c.Symbol,
@@ -89,15 +91,17 @@
 
     private void PrepareChartData()
     {
+        var allLabel = TopCryptos.Select(c => (object)c.Name).ToList();
+        var allData = TopCryptos.Select(c => c.CurrentPrice).ToList();
         chartData = new ChartData<decimal>
             {
-                Labels = TopCryptos.Select(c => (object)c.Name).ToList(), // Convertir les labels en object
+                Labels = allLabel, // Convertir les labels en object
                 Datasets = new List<ChartDataset<decimal>> // Utiliser ChartDataset au lieu de BarChartDataset
         {
             new ChartDataset<decimal>
             {
                 Label = "Prix actuel (€)",
-                Data = TopCryptos.Select(c => c.CurrentPrice).ToList(),
+                Data = allData,
                 BackgroundColor = new List<string>
                 {
                     "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"
@@ -108,26 +112,5 @@
     }
 
 
-    private class CryptoApiResponse
-    {
-        [JsonPropertyName("name")]
-        public string Name { get; set; }
 
-        [JsonPropertyName("symbol")]
-        public string Symbol { get; set; }
-
-        [JsonPropertyName("current_price")]
-        public decimal CurrentPrice { get; set; }
-
-        [JsonPropertyName("price_change_percentage_24h")]
-        public decimal? PriceChangePercentage24h { get; set; }
-    }
-
-    private class Crypto
-    {
-        public string Name { get; set; }
-        public string Symbol { get; set; }
-        public decimal CurrentPrice { get; set; }
-        public decimal? PriceChange24h { get; set; }
-    }
 }
